@@ -1,0 +1,138 @@
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+
+class QemuGenerator:
+    def __init__(self, config):
+        self.config = config
+        self.vm_name = config['vm']['name']
+        self.arch = config['vm'].get('architecture', 'x86_64')
+        self.disk_path = Path("disk.qcow2")
+        
+        if self.arch == 'aarch64':
+            self.iso_label = "RHEL-10-AARCH64" 
+            self.console = "ttyAMA0"
+        else:
+            self.iso_label = "RHEL-10-X86_64"
+            self.console = "ttyS0"
+
+    def find_qemu_img(self):
+        qemu_img = shutil.which("qemu-img")
+        if qemu_img:
+            return qemu_img
+        raise FileNotFoundError("qemu-img not found. Install qemu-utils / qemu-kvm.")
+
+    def create_disk_image(self):
+        qemu_img = self.find_qemu_img()
+        cmd = [qemu_img, "create", "-f", "qcow2", str(self.disk_path), f"{self.config['vm']['disk_size_gb']}G"]
+        print(f"Creating disk image: {' '.join(cmd)}")
+        subprocess.check_call(cmd)
+
+    def remaster_iso(self, iso_path: Path, ks_cfg_path: Path) -> Path:
+        print(f"Remastering ISO {iso_path} with Kickstart...")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            iso_contents = temp_path / "iso_contents"
+            iso_contents.mkdir()
+            mount_point = temp_path / "mnt"
+            mount_point.mkdir()
+
+            # Mount ISO (loop)
+            subprocess.check_call(["sudo", "mount", "-o", "loop", str(iso_path), str(mount_point)])
+            try:
+                subprocess.check_call(["cp", "-a", f"{mount_point}/.", str(iso_contents)])
+            finally:
+                subprocess.check_call(["sudo", "umount", str(mount_point)])
+
+            # Copy ks.cfg
+            shutil.copy2(ks_cfg_path, iso_contents / "ks.cfg")
+
+            # Patch grub.cfg to add kickstart and speed boot
+            grub_cfg_path = iso_contents / "EFI" / "BOOT" / "grub.cfg"
+            if grub_cfg_path.exists():
+                content = grub_cfg_path.read_text()
+                lines = content.splitlines()
+                modified = []
+                in_install = False
+                kickstart_arg = f' inst.ks=cdrom:/ks.cfg inst.text console={self.console},115200 console=tty0'
+                for line in lines:
+                    if line.strip().startswith('set timeout='):
+                        line = 'set timeout=1'
+                    if line.strip().startswith('set default='):
+                        line = 'set default=0'
+                    if 'menuentry' in line and 'install' in line.lower():
+                        in_install = True
+                    elif 'menuentry' in line and in_install and '}' in line:
+                        in_install = False
+                    if in_install and line.strip().startswith('linux'):
+                        line = re.sub(r'hd:LABEL=[^ ]+', f'hd:LABEL={self.iso_label}', line)
+                        line = line.replace('rd.live.check', '')
+                        if 'inst.ks' not in line:
+                            line += kickstart_arg
+                    modified.append(line)
+                grub_cfg_path.write_text('\n'.join(modified))
+            else:
+                print(f"Warning: grub.cfg not found at {grub_cfg_path}")
+
+            remastered_iso = Path.cwd() / "install-remastered.iso"
+            cmd_xorriso = [
+                "xorriso", "-as", "mkisofs",
+                "-r", "-J",
+                "-V", self.iso_label,
+                "-e", "images/efiboot.img",
+                "-no-emul-boot",
+                "-isohybrid-gpt-basdat",
+                "-o", str(remastered_iso),
+                str(iso_contents)
+            ]
+            print(f"Building ISO: {' '.join(cmd_xorriso)}")
+            subprocess.check_call(cmd_xorriso)
+            return remastered_iso
+
+    def get_qemu_cmd(self, iso_path=None):
+        accel = "kvm" if Path("/dev/kvm").exists() else "tcg"
+        
+        # Common arguments
+        cmd = []
+        if self.arch == 'aarch64':
+            cmd = [
+                "qemu-system-aarch64",
+                "-machine", f"virt,accel={accel}",
+                "-bios", "/usr/share/AAVMF/AAVMF_CODE.fd"
+            ]
+        else:
+             cmd = [
+                "qemu-system-x86_64",
+                "-machine", f"q35,accel={accel}"
+            ]
+
+        cmd.extend([
+            "-m", str(self.config['vm']['memory_mb']),
+            "-smp", str(self.config['vm']['cpu_cores']),
+            "-cpu", "host",
+            "-drive", f"file={self.disk_path},if=virtio,format=qcow2",
+            "-netdev", f"user,id=net0,hostfwd=tcp::{self.config['ssh']['port']}-:22",
+            "-device", "virtio-net-pci,netdev=net0",
+            "-nographic"
+        ])
+
+        if iso_path:
+            cmd.extend(["-cdrom", str(iso_path)])
+            cmd.extend(["-boot", "d"])
+        
+        return cmd
+
+    def run_install(self, remastered_iso: Path):
+        cmd = self.get_qemu_cmd(remastered_iso)
+        print(f"Starting unattended install ({self.arch})...")
+        print(' '.join(cmd))
+        subprocess.check_call(cmd)
+
+    def start_vm(self):
+        cmd = self.get_qemu_cmd(None)
+        print(f"Starting VM ({self.arch}) for post-install configuration...")
+        print(' '.join(cmd))
+        return subprocess.Popen(cmd)

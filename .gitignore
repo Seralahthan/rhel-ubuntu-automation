@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+venv/
+*.iso
+disk.qcow2
+ks.cfg
+*.log
+seed_content/
+working-utm-contents/
+downloads/*
+!downloads/.gitkeep
+.DS_Store
+*.utm/

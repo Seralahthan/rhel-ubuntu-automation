@@ -1,0 +1,55 @@
+#version=RHEL9
+# Kickstart file for automated RHEL install
+
+# Use text mode install
+text
+# Do not configure the X Window System
+skipx
+
+# System language
+lang en_US.UTF-8
+# Keyboard layouts
+keyboard --vckeymap=us --xlayouts='us'
+# System timezone
+timezone UTC
+
+# Network information
+network  --bootproto=dhcp --activate
+
+# Root password (will be replaced by automation)
+rootpw --plaintext {{ root_password }}
+# Create admin user
+user --name={{ user_name }} --password={{ user_password }} --plaintext --groups=wheel
+
+# Firewall configuration
+firewall --enabled --service=ssh
+# SELinux configuration
+selinux --enforcing
+
+# Installation source (cdrom)
+cdrom
+
+# Partition info
+ignoredisk --only-use=vda
+clearpart --none --initlabel
+autopart
+
+# Reboot after installation
+poweroff
+
+%packages
+@^minimal-environment
+kexec-tools
+%end
+
+%post
+echo "Automation Post-Install Script Running..."
+
+# Enable SSH Root Login (Mimics "Allow root SSH login with password")
+echo "PermitRootLogin yes" > /etc/ssh/sshd_config.d/99-automation-root.conf
+chmod 600 /etc/ssh/sshd_config.d/99-automation-root.conf
+
+# Enable sudo for wheel group without password (if an admin user is created)
+echo "%wheel ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/automation
+chmod 0440 /etc/sudoers.d/automation
+%end

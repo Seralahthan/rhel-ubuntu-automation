@@ -1,0 +1,32 @@
+vm:
+  name: "RHEL-10-QEMU"
+  # architecture: "x86_64"     # For Intel/AMD runners
+  architecture: "aarch64"    # For ARM64 runners
+  memory_mb: 8192
+  cpu_cores: 6
+  disk_size_gb: 50
+
+os:
+  version: "10.0"
+  # iso_path: "./downloads/rhel-10.0-x86_64-dvd.iso"
+  iso_path: "./downloads/rhel-10.0-aarch64-dvd.iso"
+  download:
+    enabled: true
+    method: "sftp" # Options: "http" (url) or "sftp"
+    sftp:
+      host: "sftp.example.com" # Overridden by env var RHEL_SFTP_HOST
+      port: 22
+      remote_path: "/reliancesub/automation/rhel-10.0-aarch64-dvd.iso"
+      # Username/Password will be read from env vars: RHEL_SFTP_USER, RHEL_SFTP_PASS
+ssh:
+  user: "env_override" # Overridden by env var RHEL_SSH_USER
+  password: "env_override" # Overridden by env var RHEL_SSH_PASS
+  port: 2222
+
+packages:
+  - podman
+  - nginx
+
+subscription:
+  username: "env_override" # Overridden by env var RHEL_SUB_USER
+  password: "env_override" # Overridden by env var RHEL_SUB_PASS

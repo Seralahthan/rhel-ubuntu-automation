@@ -1,0 +1,45 @@
+name: RHEL QEMU Automation (ARM64)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04-arm64
+    env:
+      ISO_NAME: rhel-10.0-aarch64-dvd.iso
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache RHEL ISO
+        id: cache-iso
+        uses: actions/cache@v4
+        with:
+          path: downloads/${{ env.ISO_NAME }}
+          key: rhel-iso-${{ env.ISO_NAME }}
+
+      - name: Install deps & run automation
+        env:
+          # SFTP Credentials
+          RHEL_SFTP_HOST: ${{ secrets.RHEL_SFTP_HOST }}
+          RHEL_SFTP_USER: ${{ secrets.RHEL_SFTP_USER }}
+          RHEL_SFTP_PASS: ${{ secrets.RHEL_SFTP_PASS }}
+          # VM Credentials & Subscription
+          RHEL_SSH_USER: ${{ secrets.RHEL_SSH_USER }}
+          RHEL_SSH_PASS: ${{ secrets.RHEL_SSH_PASS }}
+          RHEL_SUB_USER: ${{ secrets.RHEL_SUB_USER }}
+          RHEL_SUB_PASS: ${{ secrets.RHEL_SUB_PASS }}
+          # Fallback
+          RHEL_ISO_URL: ${{ secrets.RHEL_ISO_URL }}
+        run: |
+          chmod +x init_setup.sh
+          ./init_setup.sh
+
+      - name: Verify artifacts
+        run: |
+          test -f disk.qcow2
+          test -f install-remastered.iso
+          echo "Artifacts present: disk.qcow2, install-remastered.iso"
