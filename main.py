@@ -74,7 +74,17 @@ def ensure_iso(config):
                 local_download_path += ".gz"
 
             print(f"Downloading {remote_path} to {local_download_path} ...")
-            sftp.get(remote_path, local_download_path)
+            
+            # Progress callback: Print every ~500MB
+            last_printed_chunk = [0]
+            def progress(transferred, total):
+                chunk_size = 500 * 1024 * 1024
+                current_chunk = transferred // chunk_size
+                if current_chunk > last_printed_chunk[0] or transferred == total:
+                    last_printed_chunk[0] = current_chunk
+                    print(f"--> Downloaded: {transferred // (1024*1024)}MB / {total // (1024*1024)}MB ({transferred/total*100:.1f}%)")
+
+            sftp.get(remote_path, local_download_path, callback=progress)
             print("\nDownload complete.")
             sftp.close()
 
