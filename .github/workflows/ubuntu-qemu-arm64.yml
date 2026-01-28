@@ -21,6 +21,10 @@ jobs:
           path: downloads/${{ env.ISO_NAME }}
           key: rhel-iso-${{ env.ISO_NAME }}
 
+      - name: Install Python Dependencies
+        run: |
+          pip install -r requirements.txt
+
       - name: Download ISO (if missing)
         env:
           # SFTP Credentials
