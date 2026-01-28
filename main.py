@@ -67,19 +67,14 @@ def ensure_iso(config):
             transport.connect(username=user, password=password)
             sftp = paramiko.SFTPClient.from_transport(transport)
             
-            # Progress callback
-            def progress(transferred, total):
-                 percent = (transferred / total) * 100
-                 print(f"Downloading: {percent:.1f}% ({transferred//1024//1024}MB)", end='\r')
-
             # Handle compressed download
             local_download_path = str(iso_path)
             is_gzipped = remote_path.endswith('.gz')
             if is_gzipped:
                 local_download_path += ".gz"
 
-            print(f"Downloading {remote_path} to {local_download_path}")
-            sftp.get(remote_path, local_download_path, callback=progress)
+            print(f"Downloading {remote_path} to {local_download_path} ...")
+            sftp.get(remote_path, local_download_path)
             print("\nDownload complete.")
             sftp.close()
 
