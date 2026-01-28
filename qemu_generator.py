@@ -60,7 +60,8 @@ class QemuGenerator:
                 lines = content.splitlines()
                 modified = []
                 in_install = False
-                kickstart_arg = f' inst.ks=cdrom:/ks.cfg inst.text console={self.console},115200 console=tty0'
+                # Remove console=tty0 to force output to serial console only
+                kickstart_arg = f' inst.ks=cdrom:/ks.cfg inst.text console={self.console},115200'
                 for line in lines:
                     if line.strip().startswith('set timeout='):
                         line = 'set timeout=1'
