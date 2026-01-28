@@ -37,9 +37,10 @@ def load_config(path="config.yaml"):
 def ensure_iso(config):
     iso_path = Path(config['os']['iso_path'])
     if iso_path.exists():
-        print(f"ISO found at {iso_path}")
+        print(f"--> CACHE HIT: ISO found at {iso_path}. Skipping download.")
         return iso_path
     
+    print(f"--> CACHE MISS: ISO not found at {iso_path}. Starting download.")
     iso_path.parent.mkdir(parents=True, exist_ok=True)
     download_cfg = config['os'].get('download', {})
     
@@ -127,6 +128,10 @@ def main():
     config = load_config()
 
     iso_path = ensure_iso(config)
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "--download-only":
+        print("Download-only mode requested. Exiting.")
+        sys.exit(0)
 
     print("[1] Generate Kickstart")
     ks = KickstartGenerator(config)

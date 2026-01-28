@@ -14,26 +14,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache RHEL ISO
+      - name: Restore RHEL ISO
         id: cache-iso
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
+        with:
+          path: downloads/${{ env.ISO_NAME }}
+          key: rhel-iso-${{ env.ISO_NAME }}
+
+      - name: Download ISO (if missing)
+        env:
+          # SFTP Credentials
+          RHEL_SFTP_HOST: ${{ secrets.RHEL_SFTP_HOST }}
+          RHEL_SFTP_USER: ${{ secrets.RHEL_SFTP_USER }}
+          RHEL_SFTP_PASS: ${{ secrets.RHEL_SFTP_PASS }}
+          # Fallback
+          RHEL_ISO_URL: ${{ secrets.RHEL_ISO_URL }}
+        run: |
+          python -u main.py --download-only
+
+      - name: Save RHEL ISO to Cache
+        if: steps.cache-iso.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
         with:
           path: downloads/${{ env.ISO_NAME }}
           key: rhel-iso-${{ env.ISO_NAME }}
 
       - name: Install deps & run automation
         env:
-          # SFTP Credentials
-          RHEL_SFTP_HOST: ${{ secrets.RHEL_SFTP_HOST }}
-          RHEL_SFTP_USER: ${{ secrets.RHEL_SFTP_USER }}
-          RHEL_SFTP_PASS: ${{ secrets.RHEL_SFTP_PASS }}
           # VM Credentials & Subscription
           RHEL_SSH_USER: ${{ secrets.RHEL_SSH_USER }}
           RHEL_SSH_PASS: ${{ secrets.RHEL_SSH_PASS }}
           RHEL_SUB_USER: ${{ secrets.RHEL_SUB_USER }}
           RHEL_SUB_PASS: ${{ secrets.RHEL_SUB_PASS }}
-          # Fallback
-          RHEL_ISO_URL: ${{ secrets.RHEL_ISO_URL }}
+          RHEL_ISO_URL: "dummy" # already downloaded
         run: |
           chmod +x init_setup.sh
           ./init_setup.sh

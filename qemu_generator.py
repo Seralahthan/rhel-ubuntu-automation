@@ -96,14 +96,17 @@ class QemuGenerator:
             return remastered_iso
 
     def get_qemu_cmd(self, iso_path=None):
-        accel = "kvm" if Path("/dev/kvm").exists() else "tcg"
+        has_kvm = Path("/dev/kvm").exists() and os.access("/dev/kvm", os.W_OK)
+        accel = "kvm" if has_kvm else "tcg"
+        cpu_type = "host" if has_kvm else "max"
         
         # Common arguments
         cmd = []
         if self.arch == 'aarch64':
+            # Add highmem=on and gic-version=3 for better compatibility with large RAM
             cmd = [
                 "qemu-system-aarch64",
-                "-machine", f"virt,accel={accel}",
+                "-machine", f"virt,accel={accel},highmem=on,gic-version=3",
                 "-bios", "/usr/share/AAVMF/AAVMF_CODE.fd"
             ]
         else:
@@ -115,7 +118,7 @@ class QemuGenerator:
         cmd.extend([
             "-m", str(self.config['vm']['memory_mb']),
             "-smp", str(self.config['vm']['cpu_cores']),
-            "-cpu", "host",
+            "-cpu", cpu_type,
             "-drive", f"file={self.disk_path},if=virtio,format=qcow2",
             "-netdev", f"user,id=net0,hostfwd=tcp::{self.config['ssh']['port']}-:22",
             "-device", "virtio-net-pci,netdev=net0",
