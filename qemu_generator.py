@@ -43,7 +43,10 @@ class QemuGenerator:
             # Mount ISO (loop)
             subprocess.check_call(["sudo", "mount", "-o", "loop", str(iso_path), str(mount_point)])
             try:
-                subprocess.check_call(["cp", "-a", f"{mount_point}/.", str(iso_contents)])
+                # Use sudo to copy (bypass permission issues), then claim ownership
+                subprocess.check_call(["sudo", "cp", "-a", f"{mount_point}/.", str(iso_contents)])
+                subprocess.check_call(["sudo", "chown", "-R", f"{os.getuid()}:{os.getgid()}", str(iso_contents)])
+                subprocess.check_call(["chmod", "-R", "u+w", str(iso_contents)])
             finally:
                 subprocess.check_call(["sudo", "umount", str(mount_point)])
 
