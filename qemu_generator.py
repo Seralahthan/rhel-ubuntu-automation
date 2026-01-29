@@ -60,9 +60,9 @@ class QemuGenerator:
                 lines = content.splitlines()
                 modified = []
                 in_install = False
-                # Remove console=tty0 and disable Plymouth + enable detailed debug logs
+                # Remove console=tty0 and disable Plymouth
                 # Use explicit LABEL for kickstart to avoid cdrom detection issues
-                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text console={self.console},115200 plymouth.enable=0 rd.debug rd.live.debug'
+                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text console={self.console},115200 plymouth.enable=0'
                 for line in lines:
                     if line.strip().startswith('set timeout='):
                         line = 'set timeout=1'

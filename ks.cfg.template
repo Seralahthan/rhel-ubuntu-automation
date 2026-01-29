@@ -31,7 +31,8 @@ cdrom
 
 # Partition info
 ignoredisk --only-use=vda
-clearpart --none --initlabel
+zerombr
+clearpart --all --initlabel
 autopart
 
 # Reboot after installation
