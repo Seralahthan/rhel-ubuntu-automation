@@ -68,6 +68,13 @@ jobs:
           chmod +x init_setup.sh
           ./init_setup.sh
 
+      - name: Debug VM Status (if install hangs)
+        run: |
+          sleep 1200  # Wait 20 minutes for install to start
+          echo "Checking VM status..."
+          sshpass -p password ssh -p 2222 -o StrictHostKeyChecking=no root@localhost "ps aux | grep anaconda; echo '--- Last 10 Anaconda logs ---'; tail -n 10 /tmp/anaconda.log; echo '--- Entropy ---'; cat /proc/sys/kernel/random/entropy_avail" || echo "SSH failed - VM may be hung or not ready"
+        continue-on-error: true
+
       - name: Verify artifacts
         run: |
           test -f disk.qcow2
