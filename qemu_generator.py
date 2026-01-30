@@ -62,7 +62,8 @@ class QemuGenerator:
                 in_install = False
                 # Remove console=tty0 and disable Plymouth
                 # Use explicit LABEL for kickstart to avoid cdrom detection issues
-                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text console={self.console},115200 plymouth.enable=0'
+                # inst.sshd allows debugging via ssh -p 2222 root@localhost during install
+                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text inst.sshd console={self.console},115200 plymouth.enable=0'
                 for line in lines:
                     if line.strip().startswith('set timeout='):
                         line = 'set timeout=1'
