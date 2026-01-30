@@ -182,18 +182,22 @@ class QemuGenerator:
 
     def debug_snapshot(self):
         # Helper to ssh in and dump logs
-        print("Attempting to SSH into installer at -p 2222...")
+        print("ATTEMPTING TO EXTRACT DEBUG LOGS VIA SSH...")
         try:
-             cmd = ["ssh", "-p", "2222", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5", "root@localhost", 
-                    "cat /tmp/storage.log /tmp/anaconda.log"]
-             # We need 'sshpass' or the 'inst.sshpw' to work with empty pass or 'password'
-             # Since we set inst.sshpw=password, we need sshpass to automate it, or just hope keys work?
-             # Keys won't work on fresh install. We need sshpass.
-             # GitHub Actions runner might not have sshpass.
-             # We will just print instructions for now as the user asked for modification to *extract* file.
-             pass
+             # Use sshpass to handle the password for the 'root' user
+             # We fetch storage.log and anaconda.log
+             cmd = [
+                 "sshpass", "-p", "password", 
+                 "ssh", "-p", "2222", 
+                 "-o", "StrictHostKeyChecking=no", 
+                 "-o", "UserKnownHostsFile=/dev/null", 
+                 "root@localhost", 
+                 "echo '--- STORAGE LOG ---'; cat /tmp/storage.log; echo '--- ANACONDA LOG ---'; tail -n 100 /tmp/anaconda.log"
+             ]
+             print(" ".join(cmd))
+             subprocess.check_call(cmd)
         except Exception as e:
-             print(f"Debug snapshot failed: {e}")
+             print(f"FAILED to extract logs: {e}")
 
     def start_vm(self):
         cmd = self.get_qemu_cmd(None)

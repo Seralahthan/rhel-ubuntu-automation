@@ -64,6 +64,7 @@ jobs:
           RHEL_SUB_PASS: ${{ secrets.RHEL_SUB_PASS }}
           RHEL_ISO_URL: "dummy" # already downloaded
         run: |
+          sudo apt-get install -y sshpass
           chmod +x init_setup.sh
           ./init_setup.sh
 
