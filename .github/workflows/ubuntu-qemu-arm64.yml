@@ -66,6 +66,8 @@ jobs:
         run: |
           sudo apt-get install -y sshpass
           chmod +x init_setup.sh
+          # Force fresh remaster by removing any existing remastered ISO
+          rm -f install-remastered.iso
           ./init_setup.sh
 
       - name: Debug VM Status (if install hangs)
