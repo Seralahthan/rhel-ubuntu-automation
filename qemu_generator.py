@@ -64,9 +64,8 @@ class QemuGenerator:
                 # Use explicit LABEL for kickstart to avoid cdrom detection issues
                 # inst.sshd allows debugging via ssh -p 2222 root@localhost during install
                 # inst.sshpw sets a known password for the ssh session
-                # inst.debug enables debug logging
                 # systemd.show_status=auto reduces boot noise
-                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text inst.sshd inst.sshpw=password inst.debug systemd.show_status=auto console={self.console},115200 plymouth.enable=0'
+                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text inst.sshd inst.sshpw=password systemd.show_status=auto console={self.console},115200 plymouth.enable=0'
                 for line in lines:
                     if line.strip().startswith('set timeout='):
                         line = 'set timeout=1'
@@ -128,6 +127,7 @@ class QemuGenerator:
             "-drive", f"file={self.disk_path},if=virtio,format=qcow2",
             "-netdev", f"user,id=net0,hostfwd=tcp::{self.config['ssh']['port']}-:22",
             "-device", "virtio-net-pci,netdev=net0",
+            "-device", "virtio-rng-pci",
             "-nographic"
         ])
 
@@ -150,7 +150,8 @@ class QemuGenerator:
         # Use stdout=PIPE to capture logs, stderr to STDOUT to merge them
         try:
              process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-        except Exception as e:
+        excep# Run in binary mode to allow os.read to handle TUI output cleanly without blocking on newlines
+             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
              print(f"Failed to start QEMU: {e}")
              sys.exit(1)
 
@@ -163,9 +164,10 @@ class QemuGenerator:
             reads = [process.stdout.fileno()]
             ret = select.select(reads, [], [], 1.0) # 1 second timeout for select
 
-            if process.stdout.fileno() in ret[0]:
-                line = process.stdout.readline()
-                if line:
+            if p# Read raw bytes to avoid blocking on TUI partial lines
+                output = os.read(process.stdout.fileno(), 1024)
+                if output:
+                    print(output.decode('utf-8', errors='replace'), end='', flush=True
                     print(line, end='')
             
             # Check for hang (simple heuristic: 20 minutes passed)
