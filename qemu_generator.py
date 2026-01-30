@@ -149,9 +149,9 @@ class QemuGenerator:
         
         # Use stdout=PIPE to capture logs, stderr to STDOUT to merge them
         try:
-             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-        excep# Run in binary mode to allow os.read to handle TUI output cleanly without blocking on newlines
-             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+             # Run in binary mode to allow os.read to handle TUI output cleanly without blocking on newlines
+             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        except Exception as e:
              print(f"Failed to start QEMU: {e}")
              sys.exit(1)
 
