@@ -144,35 +144,34 @@ class QemuGenerator:
         # Start QEMU and stream output
         import sys
         import time
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        import select
         
-        # Thread to read logs
-        def log_streamer():
-            with process.stdout:
-                for line in iter(process.stdout.readline, ''):
-                    print(line, end='')
-        
-        # We will poll the process. If it runs too long (e.g. 10 mins) without finishing
-        # We can try to SSH in automatically to grab logs.
+        # Use stdout=PIPE to capture logs, stderr to STDOUT to merge them
+        try:
+             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        except Exception as e:
+             print(f"Failed to start QEMU: {e}")
+             sys.exit(1)
+
         start_time = time.time()
         ssh_checked = False
         
+        # Non-blocking read loop
         while process.poll() is None:
-            # Print output from stdout (using readline non-blocking usually requires select, 
-            # effectively here we just let the parent process stdout flow to terminal naturally 
-            # via the Popen above IF we didn't use PIPE.
-            # But we used PIPE to potentially inspect.
-            # Actually, standard efficient way to just let it run:
-            pass 
+            # Check if data is available to read from stdout
+            reads = [process.stdout.fileno()]
+            ret = select.select(reads, [], [], 1.0) # 1 second timeout for select
+
+            if process.stdout.fileno() in ret[0]:
+                line = process.stdout.readline()
+                if line:
+                    print(line, end='')
             
-            # Read line-by-line printing is better
-            line = process.stdout.readline()
-            if line:
-                print(line, end='')
-                
             # Check for hang (simple heuristic: 20 minutes passed)
-            if not ssh_checked and (time.time() - start_time > 1200):
-                 print("!!! DETECTED POTENTIAL HANG - ATTEMPTING DEBUG SNAPSHOT !!!")
+            # Use 1200 seconds (20 mins), logging to ensure timer is working
+            elapsed = time.time() - start_time
+            if not ssh_checked and elapsed > 1200:
+                 print(f"\n!!! DETECTED POTENTIAL HANG ({elapsed:.0f}s) - ATTEMPTING DEBUG SNAPSHOT !!!")
                  self.debug_snapshot()
                  ssh_checked = True
 
