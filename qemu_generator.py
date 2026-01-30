@@ -164,11 +164,11 @@ class QemuGenerator:
             reads = [process.stdout.fileno()]
             ret = select.select(reads, [], [], 1.0) # 1 second timeout for select
 
-            if p# Read raw bytes to avoid blocking on TUI partial lines
+            if process.stdout.fileno() in ret[0]:
+                # Read raw bytes to avoid blocking on TUI partial lines
                 output = os.read(process.stdout.fileno(), 1024)
                 if output:
-                    print(output.decode('utf-8', errors='replace'), end='', flush=True
-                    print(line, end='')
+                    print(output.decode('utf-8', errors='replace'), end='', flush=True)
             
             # Check for hang (simple heuristic: 20 minutes passed)
             # Use 1200 seconds (20 mins), logging to ensure timer is working
