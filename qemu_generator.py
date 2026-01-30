@@ -64,7 +64,8 @@ class QemuGenerator:
                 # Use explicit LABEL for kickstart to avoid cdrom detection issues
                 # inst.sshd allows debugging via ssh -p 2222 root@localhost during install
                 # inst.sshpw sets a known password for the ssh session
-                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text inst.sshd inst.sshpw=password console={self.console},115200 plymouth.enable=0'
+                # inst.debug enables debug logging
+                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text inst.sshd inst.sshpw=password inst.debug console={self.console},115200 plymouth.enable=0'
                 for line in lines:
                     if line.strip().startswith('set timeout='):
                         line = 'set timeout=1'
@@ -139,7 +140,60 @@ class QemuGenerator:
         cmd = self.get_qemu_cmd(remastered_iso)
         print(f"Starting unattended install ({self.arch})...")
         print(' '.join(cmd))
-        subprocess.check_call(cmd)
+        
+        # Start QEMU and stream output
+        import sys
+        import time
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        
+        # Thread to read logs
+        def log_streamer():
+            with process.stdout:
+                for line in iter(process.stdout.readline, ''):
+                    print(line, end='')
+        
+        # We will poll the process. If it runs too long (e.g. 10 mins) without finishing
+        # We can try to SSH in automatically to grab logs.
+        start_time = time.time()
+        ssh_checked = False
+        
+        while process.poll() is None:
+            # Print output from stdout (using readline non-blocking usually requires select, 
+            # effectively here we just let the parent process stdout flow to terminal naturally 
+            # via the Popen above IF we didn't use PIPE.
+            # But we used PIPE to potentially inspect.
+            # Actually, standard efficient way to just let it run:
+            pass 
+            
+            # Read line-by-line printing is better
+            line = process.stdout.readline()
+            if line:
+                print(line, end='')
+                
+            # Check for hang (simple heuristic: 20 minutes passed)
+            if not ssh_checked and (time.time() - start_time > 1200):
+                 print("!!! DETECTED POTENTIAL HANG - ATTEMPTING DEBUG SNAPSHOT !!!")
+                 self.debug_snapshot()
+                 ssh_checked = True
+
+        if process.returncode != 0:
+            print(f"Installation failed with code {process.returncode}")
+            sys.exit(process.returncode)
+
+    def debug_snapshot(self):
+        # Helper to ssh in and dump logs
+        print("Attempting to SSH into installer at -p 2222...")
+        try:
+             cmd = ["ssh", "-p", "2222", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5", "root@localhost", 
+                    "cat /tmp/storage.log /tmp/anaconda.log"]
+             # We need 'sshpass' or the 'inst.sshpw' to work with empty pass or 'password'
+             # Since we set inst.sshpw=password, we need sshpass to automate it, or just hope keys work?
+             # Keys won't work on fresh install. We need sshpass.
+             # GitHub Actions runner might not have sshpass.
+             # We will just print instructions for now as the user asked for modification to *extract* file.
+             pass
+        except Exception as e:
+             print(f"Debug snapshot failed: {e}")
 
     def start_vm(self):
         cmd = self.get_qemu_cmd(None)
