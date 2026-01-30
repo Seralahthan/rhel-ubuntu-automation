@@ -33,10 +33,12 @@ cdrom
 ignoredisk --only-use=vda
 zerombr
 clearpart --all --initlabel
-autopart
+# Force bootloader installation in MBR (required for qemu-kvm usage effectively even with UEFI to handle the pointer)
+bootloader --location=mbr --boot-drive=vda
+autopart --type=lvm
 
 # Reboot after installation
-poweroff
+reboot
 
 %packages
 @^minimal-environment
