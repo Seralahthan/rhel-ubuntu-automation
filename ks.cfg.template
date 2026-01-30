@@ -34,7 +34,7 @@ ignoredisk --only-use=vda
 zerombr
 clearpart --all --initlabel
 # Install bootloader in EFI for ARM64
-bootloader --location=partition --boot-drive=vda
+bootloader --boot-drive=vda
 autopart --type=lvm
 
 # Reboot after installation
