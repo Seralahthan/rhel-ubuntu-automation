@@ -1,8 +1,8 @@
 name: RHEL QEMU Automation (ARM64)
 
 on:
-  push:
-    branches: ["main"]
+  # push:
+  #   branches: ["main"]
   workflow_dispatch:
     inputs:
       debug_enabled:
@@ -64,7 +64,7 @@ jobs:
           RHEL_SUB_PASS: ${{ secrets.RHEL_SUB_PASS }}
           RHEL_ISO_URL: "dummy" # already downloaded
         run: |
-          sudo apt-get install -y sshpass
+          sudo apt-get update
           chmod +x init_setup.sh
           # Force fresh remaster by removing any existing remastered ISO
           rm -f install-remastered.iso

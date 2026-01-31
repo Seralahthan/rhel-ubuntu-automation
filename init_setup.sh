@@ -6,9 +6,8 @@ cd "$(dirname "$0")"
 ISO_NAME="${ISO_NAME:-rhel-10.0-aarch64-dvd.iso}"
 ISO_PATH="./downloads/$ISO_NAME"
 
-sudo apt-get update
 # Install both x86 and arm qemu packages to support both workflows
-sudo apt-get install -y qemu-kvm qemu-system-x86 qemu-system-arm qemu-efi-aarch64 xorriso python3-venv curl
+sudo apt-get install -y qemu-kvm qemu-system-x86 qemu-system-arm qemu-efi-aarch64 xorriso python3-venv curl sshpass
 
 if [ ! -f "$ISO_PATH" ]; then
     echo "ISO not found at $ISO_PATH."
