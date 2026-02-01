@@ -38,7 +38,7 @@ bootloader --boot-drive=vda
 autopart --type=lvm
 
 # Reboot after installation
-reboot
+poweroff
 
 %packages
 @^minimal-environment

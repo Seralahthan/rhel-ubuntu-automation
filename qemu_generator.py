@@ -71,15 +71,22 @@ class QemuGenerator:
                         line = 'set timeout=1'
                     if line.strip().startswith('set default='):
                         line = 'set default=0'
-                    if 'menuentry' in line and 'install' in line.lower():
+                    # Detect install menuentry - look for menuentry with "Install" in the title
+                    if 'menuentry' in line and ('install' in line.lower() or 'Install' in line):
                         in_install = True
-                    elif 'menuentry' in line and in_install and '}' in line:
+                    # Exit install menuentry when we hit closing brace at start of line or another menuentry
+                    elif line.strip().startswith('}') and in_install:
                         in_install = False
+                    elif 'menuentry' in line and in_install:
+                        in_install = False
+                    
                     if in_install and line.strip().startswith('linux'):
+                        # Fix the stage2 label to match our new ISO label
                         line = re.sub(r'hd:LABEL=[^ ]+', f'hd:LABEL={self.iso_label}', line)
+                        # Remove media check if present (remastered ISO usually fails checksum)
                         line = line.replace('rd.live.check', '')
+                        # Add the kickstart parameter if not present
                         if 'inst.ks' not in line:
-                            kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text inst.sshd inst.sshpw=password inst.debug systemd.show_status=auto console={self.console},115200 plymouth.enable=0'
                             line += kickstart_arg
                     modified.append(line)
                 grub_cfg_path.write_text('\n'.join(modified))
@@ -109,11 +116,28 @@ class QemuGenerator:
         # Common arguments
         cmd = []
         if self.arch == 'aarch64':
-            # Add highmem=on and gic-version=3 for better compatibility with large RAM
+            # Find AAVMF firmware - try common Ubuntu/Debian paths
+            bios_paths = [
+                "/usr/share/AAVMF/AAVMF_CODE.fd",
+                "/usr/share/qemu-efi-aarch64/QEMU_EFI.fd",
+                "/usr/share/edk2/aarch64/QEMU_EFI.fd"
+            ]
+            bios_path = None
+            for path in bios_paths:
+                if Path(path).exists():
+                    bios_path = path
+                    break
+            
+            if not bios_path:
+                raise FileNotFoundError(
+                    "ARM64 UEFI firmware not found. Install: sudo apt-get install qemu-efi-aarch64"
+                )
+            
+            # Use simpler machine config without highmem to avoid potential issues
             cmd = [
                 "qemu-system-aarch64",
-                "-machine", f"virt,accel={accel},highmem=on,gic-version=3",
-                "-bios", "/usr/share/AAVMF/AAVMF_CODE.fd"
+                "-machine", f"virt,accel={accel}",
+                "-bios", bios_path
             ]
         else:
              cmd = [
@@ -158,6 +182,7 @@ class QemuGenerator:
 
         start_time = time.time()
         ssh_checked = False
+        last_status_time = start_time
         
         # Non-blocking read loop
         while process.poll() is None:
@@ -171,13 +196,19 @@ class QemuGenerator:
                 if output:
                     print(output.decode('utf-8', errors='replace'), end='', flush=True)
             
-            # Check for hang (simple heuristic: 20 minutes passed)
-            # Use 1200 seconds (20 mins), logging to ensure timer is working
+            # Print status every 5 minutes
             elapsed = time.time() - start_time
-            if not ssh_checked and elapsed > 1200:
-                 print(f"\n!!! DETECTED POTENTIAL HANG ({elapsed:.0f}s) - ATTEMPTING DEBUG SNAPSHOT !!!")
+            if elapsed - (last_status_time - start_time) >= 300:
+                 print(f"\n[STATUS] Installation running for {elapsed/60:.1f} minutes...\n", flush=True)
+                 last_status_time = time.time()
+            
+            # Check for hang (simple heuristic: 30 minutes passed)
+            # Increased from 20 to 30 minutes to account for slow ARM64 emulation
+            if not ssh_checked and elapsed > 1800:
+                 print(f"\n!!! DETECTED POTENTIAL HANG ({elapsed:.0f}s / 30min) - ATTEMPTING DEBUG SNAPSHOT !!!")
                  self.debug_snapshot()
                  ssh_checked = True
+                 # Continue running - don't kill the process yet
 
         if process.returncode != 0:
             print(f"Installation failed with code {process.returncode}")
@@ -188,19 +219,26 @@ class QemuGenerator:
         print("ATTEMPTING TO EXTRACT DEBUG LOGS VIA SSH...")
         try:
              # Use sshpass to handle the password for the 'root' user
-             # We fetch storage.log and anaconda.log
+             # We fetch storage.log, anaconda.log, program.log and check processes
              cmd = [
                  "sshpass", "-p", "password", 
                  "ssh", "-p", "2222", 
                  "-o", "StrictHostKeyChecking=no", 
-                 "-o", "UserKnownHostsFile=/dev/null", 
+                 "-o", "UserKnownHostsFile=/dev/null",
+                 "-o", "ConnectTimeout=10",
                  "root@localhost", 
-                 "echo '--- STORAGE LOG ---'; cat /tmp/storage.log; echo '--- ANACONDA LOG ---'; tail -n 100 /tmp/anaconda.log"
+                 "echo '--- ANACONDA PROCESSES ---'; ps aux | grep anaconda || true; "
+                 "echo '--- STORAGE LOG (last 50 lines) ---'; tail -n 50 /tmp/storage.log 2>/dev/null || echo 'storage.log not found'; "
+                 "echo '--- ANACONDA LOG (last 100 lines) ---'; tail -n 100 /tmp/anaconda.log 2>/dev/null || echo 'anaconda.log not found'; "
+                 "echo '--- PROGRAM LOG (last 50 lines) ---'; tail -n 50 /tmp/program.log 2>/dev/null || echo 'program.log not found'; "
+                 "echo '--- PARTITIONS ---'; lsblk 2>/dev/null || true; "
+                 "echo '--- ENTROPY ---'; cat /proc/sys/kernel/random/entropy_avail 2>/dev/null || true; "
+                 "echo '--- MEMORY ---'; free -h 2>/dev/null || true"
              ]
              print(" ".join(cmd))
              subprocess.check_call(cmd)
         except Exception as e:
-             print(f"FAILED to extract logs: {e}")
+             print(f"FAILED to extract logs (this is expected if SSH isn't ready yet): {e}")
 
     def start_vm(self):
         cmd = self.get_qemu_cmd(None)
