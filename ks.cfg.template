@@ -1,8 +1,8 @@
 #version=RHEL9
 # Kickstart file for automated RHEL install
 
-# Use cmdline mode install
-cmdline
+# Use text mode install
+text
 # Do not configure the X Window System
 skipx
 
@@ -28,12 +28,6 @@ selinux --enforcing
 
 # Installation source (cdrom)
 cdrom
-
-%anaconda
-pwpolicy root --minlen=1 --minquality=1 --notstrict --nochanges --emptyok
-pwpolicy user --minlen=1 --minquality=1 --notstrict --nochanges --emptyok
-pwpolicy luks --minlen=1 --minquality=1 --notstrict --nochanges --emptyok
-%end
 
 # Partition info
 ignoredisk --only-use=vda

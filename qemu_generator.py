@@ -64,8 +64,8 @@ class QemuGenerator:
                 # Use explicit LABEL for kickstart to avoid cdrom detection issues
                 # inst.sshd allows debugging via ssh -p 2222 root@localhost during install
                 # inst.sshpw sets a known password for the ssh session
-                # inst.cmdline forces non-interactive mode (fails fast instead of hanging at menus)
-                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.cmdline inst.sshd inst.sshpw=password inst.debug systemd.show_status=auto console={self.console},115200 plymouth.enable=0'
+                # inst.text enables text mode (more verbose, non-fatal warnings vs cmdline)
+                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text inst.sshd inst.sshpw=password inst.debug systemd.show_status=auto console={self.console},115200 plymouth.enable=0'
                 for line in lines:
                     if line.strip().startswith('set timeout='):
                         line = 'set timeout=1'
@@ -79,6 +79,7 @@ class QemuGenerator:
                         line = re.sub(r'hd:LABEL=[^ ]+', f'hd:LABEL={self.iso_label}', line)
                         line = line.replace('rd.live.check', '')
                         if 'inst.ks' not in line:
+                            kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text inst.sshd inst.sshpw=password inst.debug systemd.show_status=auto console={self.console},115200 plymouth.enable=0'
                             line += kickstart_arg
                     modified.append(line)
                 grub_cfg_path.write_text('\n'.join(modified))
