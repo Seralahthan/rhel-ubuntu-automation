@@ -64,9 +64,8 @@ class QemuGenerator:
                 # Use explicit LABEL for kickstart to avoid cdrom detection issues
                 # inst.sshd allows debugging via ssh -p 2222 root@localhost during install
                 # inst.sshpw sets a known password for the ssh session
-                # inst.debug enables debug logging
-                # systemd.show_status=auto reduces boot noise
-                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.text inst.sshd inst.sshpw=password inst.debug systemd.show_status=auto console={self.console},115200 plymouth.enable=0'
+                # inst.cmdline forces non-interactive mode (fails fast instead of hanging at menus)
+                kickstart_arg = f' inst.ks=hd:LABEL={self.iso_label}:/ks.cfg inst.cmdline inst.sshd inst.sshpw=password inst.debug systemd.show_status=auto console={self.console},115200 plymouth.enable=0'
                 for line in lines:
                     if line.strip().startswith('set timeout='):
                         line = 'set timeout=1'

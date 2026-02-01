@@ -33,8 +33,8 @@ cdrom
 ignoredisk --only-use=vda
 zerombr
 clearpart --all --initlabel
-# Install bootloader in EFI for ARM64 (removed to test if autopart handles it)
-# bootloader --location=partition --boot-drive=vda
+# Install bootloader (required for unattended install)
+bootloader --boot-drive=vda
 autopart --type=lvm
 
 # Reboot after installation
