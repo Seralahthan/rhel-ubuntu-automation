@@ -26,8 +26,8 @@ firewall --enabled --service=ssh
 # SELinux configuration
 selinux --enforcing
 
-# Installation source (cdrom)
-cdrom
+# Installation source (use the ISO mounted at /run/install/repo)
+harddrive --partition=sr0 --dir=/
 
 # Partition info
 ignoredisk --only-use=vda
